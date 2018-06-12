@@ -2,4 +2,8 @@ default folder structure to run CityscapesHelper:
 
 root
 --> CityscapesHandler.py
--->
+--> data
+    --> cityscapesscripts
+    --> gtFine      (https://www.cityscapes-dataset.com/file-handling/?packageID=1)
+    --> leftImg8bit (https://www.cityscapes-dataset.com/file-handling/?packageID=3)
+    
