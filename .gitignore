@@ -102,3 +102,8 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+data/gtFine
+data/leftImg8bit
+data/license.txt
+data/README
