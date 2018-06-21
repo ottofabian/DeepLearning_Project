@@ -1,3 +1,9 @@
+import tensorflow as tf
+import numpy as np
+
+from CityscapesHandler import CityscapesHandler
+
+
 class PixelNet:
     def __init__(self, vgg16_npy_path=None):
         self.data_dict = np.load(vgg16_npy_path, encoding='latin1').item()
@@ -63,7 +69,7 @@ class PixelNet:
         # self.conv7_3 = self.conv_layer(self.conv5_2, "conv7_3")
         # self.pool7 = self.max_pool(self.conv5_3, 'pool7')
 
-        x, y = random_sampling(features, labels, index)
+        x, y = self.random_sampling(features, labels, index)
 
         with tf.name_scope('MLP'):
             x = tf.layers.dense(x, 4096, activation_fn=tf.nn.relu, scope='fc1')
@@ -138,7 +144,7 @@ with tf.Graph().as_default():
     pn = PixelNet('./data/vgg16.npy')
     logits, y = pn.run(images=images, labels=labels, index=index, num_classes=n_classes)
 
-    y = tf.one_hot(y, num_classes)
+    y = tf.one_hot(y, n_classes)
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logits)
     loss = tf.reduce_mean(cross_entropy)
 
@@ -157,4 +163,4 @@ with tf.Graph().as_default():
         _, loss_value = sess.run([train_op, loss],
                                  feed_dict=feed_dict)
 
-        print('Step %d: loss = %.2f (%.3f sec)' % (step, loss_value, duration))
+        print('Step %d: loss = %.2f' % (step, loss_value))
