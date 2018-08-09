@@ -29,54 +29,47 @@ class PixelNet:
 
         # VGG part
         # maybe replace this one with 3,3 conv layers
-        self.conv1_1 = self.conv_layer(images, "conv1_1")
-        self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")
-        self.pool1 = self.max_pool(self.conv1_2, 'pool1')
+        with tf.name_scope('conv_1'):
+            self.conv1_1 = self.conv_layer(images, "conv1_1")
+            self.conv1_2 = self.conv_layer(self.conv1_1, "conv1_2")
+            features.append(self.conv1_2)
+            self.pool1 = self.max_pool(self.conv1_2, 'pool1')
 
-        self.conv2_1 = self.conv_layer(self.pool1, "conv2_1")
-        self.conv2_2 = self.conv_layer(self.conv2_1, "conv2_2")
-        self.pool2 = self.max_pool(self.conv2_2, 'pool2')
+        with tf.name_scope('conv_2'):
+            self.conv2_1 = self.conv_layer(self.pool1, "conv2_1")
+            self.conv2_2 = self.conv_layer(self.conv2_1, "conv2_2")
+            features.append(self.conv2_2)
+            self.pool2 = self.max_pool(self.conv2_2, 'pool2')
 
-        self.conv3_1 = self.conv_layer(self.pool2, "conv3_1")
-        self.conv3_2 = self.conv_layer(self.conv3_1, "conv3_2")
-        self.conv3_3 = self.conv_layer(self.conv3_2, "conv3_3")
-        self.pool3 = self.max_pool(self.conv3_3, 'pool3')
+        with tf.name_scope('conv_3'):
+            self.conv3_1 = self.conv_layer(self.pool2, "conv3_1")
+            self.conv3_2 = self.conv_layer(self.conv3_1, "conv3_2")
+            self.conv3_3 = self.conv_layer(self.conv3_2, "conv3_3")
+            features.append(self.conv3_3)
+            self.pool3 = self.max_pool(self.conv3_3, 'pool3')
 
-        self.conv4_1 = self.conv_layer(self.pool3, "conv4_1")
-        self.conv4_2 = self.conv_layer(self.conv4_1, "conv4_2")
-        self.conv4_3 = self.conv_layer(self.conv4_2, "conv4_3")
-        self.pool4 = self.max_pool(self.conv4_3, 'pool4')
+        with tf.name_scope('conv_4'):
+            self.conv4_1 = self.conv_layer(self.pool3, "conv4_1")
+            self.conv4_2 = self.conv_layer(self.conv4_1, "conv4_2")
+            self.conv4_3 = self.conv_layer(self.conv4_2, "conv4_3")
+            features.append(self.conv4_3)
+            self.pool4 = self.max_pool(self.conv4_3, 'pool4')
 
-        self.conv5_1 = self.conv_layer(self.pool4, "conv5_1")
-        self.conv5_2 = self.conv_layer(self.conv5_1, "conv5_2")
-        self.conv5_3 = self.conv_layer(self.conv5_2, "conv5_3")
-        self.pool5 = self.max_pool(self.conv5_3, 'pool5')
-
-        self.conv5_1 = self.conv_layer(self.pool4, "conv5_1")
-        self.conv5_2 = self.conv_layer(self.conv5_1, "conv5_2")
-        self.conv5_3 = self.conv_layer(self.conv5_2, "conv5_3")
-        self.pool5 = self.max_pool(self.conv5_3, 'pool5')
-
-        features.append(self.pool5)
-
-        # self.conv6_1 = self.conv_layer(self.pool4, "conv6_1")
-        # self.conv6_2 = self.conv_layer(self.conv5_1, "conv6_2")
-        # self.conv6_3 = self.conv_layer(self.conv5_2, "conv6_3")
-        # self.pool6 = self.max_pool(self.conv5_3, 'pool6')
-        #
-        # self.conv7_1 = self.conv_layer(self.pool4, "conv7_1")
-        # self.conv7_2 = self.conv_layer(self.conv5_1, "conv7_2")
-        # self.conv7_3 = self.conv_layer(self.conv5_2, "conv7_3")
-        # self.pool7 = self.max_pool(self.conv5_3, 'pool7')
+        with tf.name_scope('conv_5'):
+            self.conv5_1 = self.conv_layer(self.pool4, "conv5_1")
+            self.conv5_2 = self.conv_layer(self.conv5_1, "conv5_2")
+            self.conv5_3 = self.conv_layer(self.conv5_2, "conv5_3")
+            features.append(self.conv5_3)
+            self.pool5 = self.max_pool(self.conv5_3, 'pool5')
 
         x, y = self.random_sampling(features, labels, index)
 
         with tf.name_scope('MLP'):
-            x = tf.layers.dense(x, 4096, activation_fn=tf.nn.relu, scope='fc1')
-            x = tf.layers.dropout(x, 0.5, scope='dropout1')
-            x = tf.layers.dense(x, 4096, activation_fn=tf.nn.relu, scope='fc2')
-            x = tf.layers.dropout(x, 0.5, scope='dropout2')
-            x = tf.layers.dense(x, num_classes, activation_fn=tf.nn.relu, scope='fc3')
+            x = tf.layers.dense(x, 4096, activation=tf.nn.relu, name='fc1')
+            x = tf.layers.dropout(x, 0.5, name='dropout1')
+            x = tf.layers.dense(x, 4096, activation=tf.nn.relu, name='fc2')
+            x = tf.layers.dropout(x, 0.5, name='dropout2')
+            x = tf.layers.dense(x, num_classes, activation=tf.nn.relu, name='fc3')
 
         self.data_dict = None
 
@@ -90,15 +83,13 @@ class PixelNet:
 
     def conv_layer(self, bottom, name):
         with tf.variable_scope(name):
-            filt = self.get_conv_filter(name)
+            filter = self.get_conv_filter(name)
 
-            conv = tf.nn.conv2d(bottom, filt, [1, 1, 1, 1], padding='SAME')
+            conv = tf.nn.conv2d(bottom, filter, [1, 1, 1, 1], padding='SAME', activation_fn=tf.nn.relu)
 
-            conv_biases = self.get_bias(name)
-            bias = tf.nn.bias_add(conv, conv_biases)
+            bias = self.get_bias(name)
+            return tf.nn.relu(tf.nn.bias_add(conv, bias))
 
-            relu = tf.nn.relu(bias)
-            return relu
 
     # def fc_layer(self, bottom, name):
     #     with tf.variable_scope(name):
@@ -127,9 +118,10 @@ class PixelNet:
 
 n_images = 5
 n_steps = 10
+n_pixels = 2000
 
 # Todo
-n_classes = 100000000
+n_classes = 30
 csh = CityscapesHandler()
 train_x, train_y = csh.getTrainSet(n_images)
 
@@ -155,10 +147,11 @@ with tf.Graph().as_default():
     sess = tf.Session()
 
     sess.run(init)
+    idx = tf.random_uniform(shape=(4000,3), dtype=tf.int32)
 
     for step in range(n_steps):
         # Todo set the index for sampling
-        feed_dict = {images: train_x, labels: train_y, index: ???}
+        feed_dict = {images: train_x, labels: train_y, index: idx}
 
         _, loss_value = sess.run([train_op, loss],
                                  feed_dict=feed_dict)
