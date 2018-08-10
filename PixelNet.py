@@ -1,5 +1,5 @@
-import tensorflow as tf
 import numpy as np
+import tensorflow as tf
 
 from CityscapesHandler import CityscapesHandler
 
@@ -18,10 +18,27 @@ class PixelNet:
                 vector = tf.concat(upsampled, axis=-1)
                 label = None
             else:
+                label = tf.gather_nd(labels, index)
                 sampled = [tf.gather_nd(feature, index) for feature in upsampled]
                 vector = tf.concat(sampled, axis=-1)
-                label = tf.gather_nd(labels, index)
         return vector, label
+
+    # pixel sampling from original implementation
+    def _sample_pixels(self, gt, samplesize, pad):
+        # (sample locations and get the labels)
+        (y, x) = (gt < 255.0).nonzero()
+        v = gt[y, x]
+        lv = len(v)
+        c = np.arange(lv)
+        if samplesize <= lv:
+            inds = np.random.choice(c, size=samplesize, replace=False)
+        else:
+            inds = np.random.choice(c, size=samplesize, replace=True)
+        y = y[inds]
+        x = x[inds]
+        labs = v[inds]
+        locs = np.array([y, x]).transpose() + pad
+        return locs, labs
 
     def run(self, images, labels, index, num_classes):
 
@@ -62,13 +79,24 @@ class PixelNet:
             features.append(self.conv5_3)
             self.pool5 = self.max_pool(self.conv5_3, 'pool5')
 
+        # conv replacement of VGG's last fc layers
+        with tf.name_scope('conv_6'):
+            self.conv6_1 = tf.layers.conv2d(self.pool5, 4096, 7, padding='SAME', activation=tf.nn.relu)
+
+        with tf.name_scope('conv_7'):
+            self.conv7_1 = tf.layers.conv2d(self.conv6_1, 4096, 1, padding='SAME', activation=tf.nn.relu)
+
+        features.append(self.conv7_1)
+
+        # sampling layer
         x, y = self.random_sampling(features, labels, index)
 
         with tf.name_scope('MLP'):
-            x = tf.layers.dense(x, 4096, activation=tf.nn.relu, name='fc1')
             x = tf.layers.dropout(x, 0.5, name='dropout1')
-            x = tf.layers.dense(x, 4096, activation=tf.nn.relu, name='fc2')
+            x = tf.layers.dense(x, 4096, activation=tf.nn.relu, name='fc1')
             x = tf.layers.dropout(x, 0.5, name='dropout2')
+            x = tf.layers.dense(x, 4096, activation=tf.nn.relu, name='fc2')
+            x = tf.layers.dropout(x, 0.5, name='dropout3')
             x = tf.layers.dense(x, num_classes, activation=tf.nn.relu, name='fc3')
 
         self.data_dict = None
@@ -85,11 +113,10 @@ class PixelNet:
         with tf.variable_scope(name):
             filter = self.get_conv_filter(name)
 
-            conv = tf.nn.conv2d(bottom, filter, [1, 1, 1, 1], padding='SAME', activation_fn=tf.nn.relu)
+            conv = tf.nn.conv2d(bottom, filter, [1, 1, 1, 1], padding='SAME')
 
             bias = self.get_bias(name)
             return tf.nn.relu(tf.nn.bias_add(conv, bias))
-
 
     # def fc_layer(self, bottom, name):
     #     with tf.variable_scope(name):
@@ -112,26 +139,25 @@ class PixelNet:
     def get_bias(self, name):
         return tf.constant(self.data_dict[name][1], name="biases")
 
-    # def get_fc_weight(self, name):
-    #     return tf.constant(self.data_dict[name][0], name="weights")
+        # def get_fc_weight(self, name):
+        #     return tf.constant(self.data_dict[name][0], name="weights")
 
 
 n_images = 5
 n_steps = 10
-n_pixels = 2000
-
-# Todo
 n_classes = 30
+pixel_sample_size = 10
+
 csh = CityscapesHandler()
 train_x, train_y = csh.getTrainSet(n_images)
-
-# Todo is this already done???
-# train_x = train_x.reshape((n_images, 224, 224, 3))
+train_y = train_y[:, :, :, None]
 
 with tf.Graph().as_default():
-    images = tf.placeholder(tf.float32, shape=[n_images, 224, 224, 3], name='images')
-    labels = tf.placeholder(tf.int32, shape=[n_images, 224, 224, 1], name='labels')
-    index = tf.placeholder(tf.int32, shape=[4000, 3], name='index')
+    images = tf.placeholder(tf.float32, shape=[n_images, 160, 320, 3], name='images')
+    labels = tf.placeholder(tf.int32, shape=[n_images, 160, 320, 1], name='labels')
+    # TODO maybe change this to [...,3]
+    # indexing is still problematic, due to memory issues.
+    index = tf.placeholder(tf.int32, shape=[pixel_sample_size, 1], name='index')
 
     pn = PixelNet('./data/vgg16.npy')
     logits, y = pn.run(images=images, labels=labels, index=index, num_classes=n_classes)
@@ -147,10 +173,10 @@ with tf.Graph().as_default():
     sess = tf.Session()
 
     sess.run(init)
-    idx = tf.random_uniform(shape=(4000,3), dtype=tf.int32)
+    idx = np.random.choice(160 * 320, size=pixel_sample_size, replace=False).reshape(pixel_sample_size, 1)
+    # idx = np.tile(idx, (3, 1)).T
 
     for step in range(n_steps):
-        # Todo set the index for sampling
         feed_dict = {images: train_x, labels: train_y, index: idx}
 
         _, loss_value = sess.run([train_op, loss],
