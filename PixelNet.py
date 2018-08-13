@@ -1,42 +1,45 @@
 import numpy as np
 import tensorflow as tf
+from PIL import Image
 
 from CityscapesHandler import CityscapesHandler
-
 
 ''' ONE POSSIBLE APPROACH TO IMPROVE TIME AND MEMORY EFFICIENCY: INSTEAD OF UPSAMPLING ALL FEATURE MAPS
 INTERPOLATE ONLY BETWEEN THE RELEVANT COLUMNS.
 TODO: ADAPT THIS FUNCTION TO TF TENSORS '''
+
+# https://stackoverflow.com/questions/34902782/interpolated-sampling-of-points-in-an-image-with-tensorflow
+
 # def bilinear_interpolation(x, y, points):
-    # '''Interpolate (x,y) from values associated with four points.
+#     '''
+#     Interpolate (x,y) from values associated with four points.
+#
+#     The four points are a list of four triplets:  (x, y, tensor).
+#     The four points can be in any order.  They should form a rectangle.
+#
+#     # >>> bilinear_interpolation(12, 5.5,
+#     # ...                        [(10, 4, 100),
+#     # ...                         (20, 4, 200),
+#     # ...                         (10, 6, 150),
+#     # ...                         (20, 6, 300)])
+#     165.0
+#     '''
+#     # See formula at:  http://en.wikipedia.org/wiki/Bilinear_interpolation
+#
+#     points = sorted(points)               # order points by x, then by y
+#     (x1, y1, q11), (_x1, y2, q12), (x2, _y1, q21), (_x2, _y2, q22) = points
+#
+#     if x1 != _x1 or x2 != _x2 or y1 != _y1 or y2 != _y2:
+#         raise ValueError('points do not form a rectangle')
+#     if not x1 <= x <= x2 or not y1 <= y <= y2:
+#         raise ValueError('(x, y) not within the rectangle')
+#
+#     return (q11 * (x2 - x) * (y2 - y) +
+#     q21 * (x - x1) * (y2 - y) +
+#     q12 * (x2 - x) * (y - y1) +
+#     q22 * (x - x1) * (y - y1)
+#     ) / ((x2 - x1) * (y2 - y1) + 0.0)
 
-    # The four points are a list of four triplets:  (x, y, tensor).
-    # The four points can be in any order.  They should form a rectangle.
-
-        # >>> bilinear_interpolation(12, 5.5,
-        # ...                        [(10, 4, 100),
-        # ...                         (20, 4, 200),
-        # ...                         (10, 6, 150),
-        # ...                         (20, 6, 300)])
-        # 165.0
-
-    # '''
-    # # See formula at:  http://en.wikipedia.org/wiki/Bilinear_interpolation
-
-    # points = sorted(points)               # order points by x, then by y
-    # (x1, y1, q11), (_x1, y2, q12), (x2, _y1, q21), (_x2, _y2, q22) = points
-
-    # if x1 != _x1 or x2 != _x2 or y1 != _y1 or y2 != _y2:
-        # raise ValueError('points do not form a rectangle')
-    # if not x1 <= x <= x2 or not y1 <= y <= y2:
-        # raise ValueError('(x, y) not within the rectangle')
-
-    # return (q11 * (x2 - x) * (y2 - y) +
-            # q21 * (x - x1) * (y2 - y) +
-            # q12 * (x2 - x) * (y - y1) +
-            # q22 * (x - x1) * (y - y1)
-           # ) / ((x2 - x1) * (y2 - y1) + 0.0)
-           
 
 class PixelNet:
     def __init__(self, vgg16_npy_path=None):
@@ -46,18 +49,19 @@ class PixelNet:
         with tf.name_scope('RandomSampling'):
             shape = features[0].shape[1:-1]
             upsampled = [features[0]]
-            
+
             for i in range(1, len(features)):
                 upsampled.append(tf.image.resize_bilinear(features[i], shape))
-               
+
             if index is None:
                 vector = tf.concat(upsampled, axis=-1)
                 label = None
             else:
-                label = tf.transpose(tf.gather_nd(tf.transpose(labels, [1,2,0,3]), index), [1,0,2])
-                sampled = [tf.transpose(tf.gather_nd(tf.transpose(feature, [1,2,0,3]), index), [1,0,2]) for feature in upsampled]
+                label = tf.transpose(tf.gather_nd(tf.transpose(labels, [1, 2, 0, 3]), index), [1, 0, 2])
+                sampled = [tf.transpose(tf.gather_nd(tf.transpose(feature, [1, 2, 0, 3]), index), [1, 0, 2]) for feature
+                           in upsampled]
                 vector = tf.concat(sampled, axis=-1)
-                
+
         return vector, label
 
     # pixel sampling from original implementation
@@ -127,8 +131,7 @@ class PixelNet:
 
         # sampling layer
         x, y = self.random_sampling(features, labels, index)
-        
-        
+
         with tf.name_scope('MLP'):
             x = tf.layers.dropout(x, 0.5, name='dropout1')
             x = tf.layers.dense(x, 4096, activation=tf.nn.relu, name='fc1')
@@ -182,27 +185,36 @@ class PixelNet:
 
 
 n_images = 1
-n_steps = 30
+n_steps = 5
 n_classes = 30
-pixel_sample_size = 4000
+pixel_sample_size = 2000
 
 csh = CityscapesHandler()
 train_x, train_y = csh.getTrainSet(n_images)
-train_y = train_y[:, :, :, None]
+
+# resize images for VGG-16
+# train_x = transform.resize(train_x, (n_images, 224, 224, 3), mode='constant')
+# train_y = transform.resize(train_y, (n_images, 224, 224, 1), mode='constant')
+
+train_x_rescaled = np.zeros(shape=(n_images, 224, 224, 3))
+
+for i in range(n_images):
+    im = Image.fromarray(train_x[i, :, :, :])
+    im.resize((224,224))
 
 with tf.Graph().as_default():
-    images = tf.placeholder(tf.float32, shape=[n_images, 160, 320, 3], name='images')
-    labels = tf.placeholder(tf.int32, shape=[n_images, 160, 320, 1], name='labels')
+    images = tf.placeholder(tf.float32, shape=[n_images, 224, 224, 3], name='images')
+    labels = tf.placeholder(tf.int32, shape=[n_images, 224, 224, 1], name='labels')
     # TODO maybe change this to [...,3]
     # indexing is still problematic, due to memory issues.
     index = tf.placeholder(tf.int32, shape=[None, 2], name='index')
 
     pn = PixelNet('./data/vgg16.npy')
-    
+
     logits, y = pn.run(images=images, labels=labels, index=index, num_classes=n_classes)
-    
+
     result = tf.argmax(logits, 2)
-    
+
     y = tf.one_hot(y, n_classes)
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logits)
     loss = tf.reduce_mean(cross_entropy)
@@ -214,34 +226,34 @@ with tf.Graph().as_default():
     sess = tf.Session()
 
     sess.run(init)
-    idx = np.random.choice(160 * 320, size=pixel_sample_size, replace=False).reshape(pixel_sample_size, 1)
-    #idx = np.tile(idx, (3, 1)).T
-    idx = np.concatenate((idx / 320, idx % 320), axis=1).astype(np.int)
-    
-    
+
     for step in range(n_steps):
+        # samples pixels new for each epoch
+        idx = np.random.choice(224 * 224, size=pixel_sample_size, replace=False).reshape(pixel_sample_size, 1)
+        # idx = np.tile(idx, (3, 1)).T
+        idx = np.concatenate((idx / 224, idx % 224), axis=1).astype(np.int)
         feed_dict = {images: train_x, labels: train_y, index: idx}
-        
+
         _, loss_value, res = sess.run([train_op, loss, result],
-                                 feed_dict=feed_dict)
+                                      feed_dict=feed_dict)
 
-        print('Step %d: loss = %.2f' % (step, loss_value))
+        print('step %d - loss: %.2f' % (step, loss_value))
 
-            
-#------------------------------------------------------------------------
-# simple visualization of training result if n_images = 1
-    pixel_sample_size = 160*320
+    # ------------------------------------------------------------------------
+
+    # simple visualization of training result if n_images = 1
+    pixel_sample_size = 160 * 320
     idx = np.random.choice(160 * 320, size=pixel_sample_size, replace=False).reshape(pixel_sample_size, 1)
     idx = np.concatenate((idx / 320, idx % 320), axis=1).astype(np.int)
-    
-    feed_dict = {images: train_x, labels: train_y, index:idx}
+
+    feed_dict = {images: train_x, labels: train_y, index: idx}
     _, loss_value, res = sess.run([train_op, loss, result],
-                                 feed_dict=feed_dict) 
-    
+                                  feed_dict=feed_dict)
+
     test = np.full((160, 320, 3), 255)
     for k in range(0, len(idx)):
-        test[idx[k, 0],idx[k, 1], 0] = res[0][k] / 30.0 * 255
-        test[idx[k, 0],idx[k, 1], 1] = 0
-        test[idx[k, 0],idx[k, 1], 2] = 0
-    
-    csh.displayImage(np.concatenate((train_x[0], test), axis=0).astype(np.uint8)) 
+        test[idx[k, 0], idx[k, 1], 0] = res[0][k] / 30.0 * 255
+        test[idx[k, 0], idx[k, 1], 1] = 0
+        test[idx[k, 0], idx[k, 1], 2] = 0
+
+    csh.displayImage(np.concatenate((train_x[0], test), axis=0).astype(np.uint8))
