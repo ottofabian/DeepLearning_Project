@@ -2,8 +2,6 @@ import numpy as np
 import tensorflow as tf
 from PIL import Image
 
-np.set_printoptions(threshold=np.inf)
-
 from CityscapesHandler import CityscapesHandler
 
 def interpolate_bipolar(I, C):    
@@ -12,105 +10,88 @@ def interpolate_bipolar(I, C):
     bottom_left = tf.cast(tf.concat([tf.ceil(C[:, 0:1]), tf.floor(C[:, 1:2])], 1), tf.int32)
     bottom_right = tf.cast(tf.ceil(C), tf.int32)
     
-    values_at_top_left = get_values_at_coordinates(I, top_left)
+    values_at_top_left = get_values_at_coordinates(I, top_left)    
     values_at_top_right = get_values_at_coordinates(I, top_right)
     values_at_bottom_left = get_values_at_coordinates(I, bottom_left)
     values_at_bottom_right = get_values_at_coordinates(I, bottom_right)
-    
+       
     # Varies between 0.0 and 1.0.
-    horizontal_offset = C[:, 0] - tf.cast(top_left[:, 0], tf.float32)
+    horizontal_offset = C[:, 0] - tf.cast(top_left[:, 0], tf.float32)    
+    horizontal_offset= tf.reshape(horizontal_offset, [-1, 1])
+    horizontal_offset = tf.tile(horizontal_offset, [1, I.shape[3]])
     
     horizontal_interpolated_top = (
         ((1.0 - horizontal_offset) * values_at_top_left)
-        + (horizontal_offset * values_at_top_right))
+        + (horizontal_offset * values_at_top_right))      
         
     horizontal_interpolated_bottom = (
         ((1.0 - horizontal_offset) * values_at_bottom_left)
         + (horizontal_offset * values_at_bottom_right))
         
-    vertical_offset = C[:, 1] - tf.cast(top_left[:, 1], tf.float32)
-
+    vertical_offset = C[:, 1] - tf.cast(top_left[:, 1], tf.float32)  
+    vertical_offset= tf.reshape(vertical_offset, [-1, 1])
+    vertical_offset = tf.tile(vertical_offset, [1,I.shape[3]])
+    
     interpolated_result = (
         ((1.0 - vertical_offset) * horizontal_interpolated_top)
         + (vertical_offset * horizontal_interpolated_bottom))
-      
+    
     return interpolated_result
     
-# original implementation for a single image 
-# def get_values_at_coordinates(input, coordinates):
-    # input_as_vector = tf.reshape(input, [-1])
-    # coordinates_as_indices = (coordinates[:, 0] * tf.shape(input)[1]) + coordinates[:, 1]
-    # return tf.gather(input_as_vector, coordinates_as_indices)
 
 #implementation for multiple feature maps
 def get_values_at_coordinates(input, coordinates):
-    input_as_vector = tf.reshape(input, [input.shape[1] * input.shape[2], input.shape[3]])
-    coordinates_as_indices = (coordinates[:, 0] * tf.shape(input)[1]) + coordinates[:, 1]
-    return tf.gather(input_as_vector, coordinates_as_indices)
+    input_as_vector = tf.reshape(input, [input.shape[0], -1, input.shape[3]])
+    coordinates_as_indices = (coordinates[:, 0] * tf.shape(input)[1]) + coordinates[:, 1]    
+    result = tf.gather(input_as_vector, coordinates_as_indices, axis=1)   
+    return result
     
     
 class PixelNet:
     def __init__(self, vgg16_npy_path=None):
         self.data_dict = np.load(vgg16_npy_path, encoding='latin1').item()
 
-    def random_sampling(self, features, labels, index):
-        with tf.name_scope('RandomSampling'):
-            shape = features[0].shape[1:-1]
-            # upsampled = [features[0]]
-            
-            # for i in range(1, len(features)):
-                # upsampled.append(tf.image.resize_bilinear(features[i], shape))
-            
-            for e in features:
-                print(e)
+        
+    def sample_sparse(self, features, index):
+        samples = []
+                          
+        for f in features:
+            idx_scaled = index / features[0].shape[1]
+            idx_scaled = tf.cast(idx_scaled, dtype=tf.float32) * tf.cast(f.shape[1], dtype=tf.float32)                          
+            samples.append(interpolate_bipolar(f, idx_scaled))
+
+        vector = tf.concat(samples, axis=-1)
+        return vector
+    
+    
+    def sample_dense(self, features, index):
+        shape = features[0].shape[1:-1]
+        upsampled = [features[0]]
+        
+        for i in range(1, len(features)):
+            upsampled.append(tf.image.resize_bilinear(features[i], shape))
+
+        label = tf.transpose(tf.gather_nd(tf.transpose(labels, [1,2,0,3]), index), [1,0,2])
+        sampled = [tf.transpose(tf.gather_nd(tf.transpose(feature, [1,2,0,3]), index), [1,0,2]) for feature in upsampled]
+        vector = tf.concat(sampled, axis=-1)
+        
+        return vector
+        
+        
+    def random_sampling(self, features, labels, index, pred):
+        with tf.name_scope('RandomSampling'):        
                 
             if index is None:
                 vector = tf.concat(upsampled, axis=-1)
                 label = None
             else:
-                samples = []
-                
-                index = tf.Print(index, [index], message="original index :")
-                
-                it = 0
-                for f in features:
-                    it += 1
-                    
-                    idx_scaled = index / features[0].shape[1]
-                    idx_scaled = tf.cast(idx_scaled, dtype=tf.float32) * tf.cast(f.shape[1], dtype=tf.float32)                    
-                    
-                    idx_scaled = tf.Print(idx_scaled, [idx_scaled], message="idx_scaled " + str(it) + ": ")
-                    
-                    samples.append(interpolate_bipolar(f, idx_scaled))
-                      
-                vector = tf.concat(samples, axis=-1)            
-            
-                label = tf.transpose(tf.gather_nd(tf.transpose(labels, [1, 2, 0, 3]), index), [1, 0, 2])
-                
-                # sampled = [tf.transpose(tf.gather_nd(tf.transpose(feature, [1, 2, 0, 3]), index), [1, 0, 2]) for feature
-                           # in upsampled]
-                # vector = tf.concat(sampled, axis=-1)
+                label = tf.transpose(tf.gather_nd(tf.transpose(labels, [1, 2, 0, 3]), index), [1, 0, 2])                
+                vector = tf.cond(pred, lambda: self.sample_dense(features, index), lambda: self.sample_sparse(features, index))
                 
         return vector, label
 
-    # pixel sampling from original implementation
-    def _sample_pixels(self, gt, samplesize, pad):
-        # (sample locations and get the labels)
-        (y, x) = (gt < 255.0).nonzero()
-        v = gt[y, x]
-        lv = len(v)
-        c = np.arange(lv)
-        if samplesize <= lv:
-            inds = np.random.choice(c, size=samplesize, replace=False)
-        else:
-            inds = np.random.choice(c, size=samplesize, replace=True)
-        y = y[inds]
-        x = x[inds]
-        labs = v[inds]
-        locs = np.array([y, x]).transpose() + pad
-        return locs, labs
 
-    def run(self, images, labels, index, num_classes):
+    def run(self, images, labels, index, num_classes, pred):
 
         features = []
 
@@ -159,11 +140,8 @@ class PixelNet:
         features.append(self.conv7_1)
 
         # sampling layer
-        x, y = self.random_sampling(features, labels, index)
+        x, y = self.random_sampling(features, labels, index, pred)        
         
-        #x = tf.Print(x, [x])
-        
-
         with tf.name_scope('MLP'):
             x = tf.layers.dropout(x, 0.5, name='dropout1')
             x = tf.layers.dense(x, 4096, activation=tf.nn.relu, name='fc1')
@@ -179,9 +157,11 @@ class PixelNet:
         else:
             return x
 
+            
     def max_pool(self, bottom, name):
         return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
+        
     def conv_layer(self, bottom, name):
         with tf.variable_scope(name):
             filter = self.get_conv_filter(name)
@@ -191,35 +171,19 @@ class PixelNet:
             bias = self.get_bias(name)
             return tf.nn.relu(tf.nn.bias_add(conv, bias))
 
-    # def fc_layer(self, bottom, name):
-    #     with tf.variable_scope(name):
-    #         shape = bottom.get_shape().as_list()
-    #         dim = 1
-    #         for d in shape[1:]:
-    #             dim *= d
-    #         x = tf.reshape(bottom, [-1, dim])
-    #
-    #         weights = self.get_fc_weight(name)
-    #         biases = self.get_bias(name)
-    #
-    #         fc = tf.nn.bias_add(tf.matmul(x, weights), biases)
-    #
-    #         return fc
-
+            
     def get_conv_filter(self, name):
         return tf.constant(self.data_dict[name][0], name="filter")
 
+        
     def get_bias(self, name):
         return tf.constant(self.data_dict[name][1], name="biases")
 
-        # def get_fc_weight(self, name):
-        #     return tf.constant(self.data_dict[name][0], name="weights")
-
 
 n_images = 1
-n_steps = 7
-n_classes = 5
-pixel_sample_size = 1
+n_steps = 5
+n_classes = 27
+pixel_sample_size = 2000
 
 csh = CityscapesHandler()
 train_x, train_y = csh.getTrainSet(n_images)
@@ -233,14 +197,16 @@ with tf.Graph().as_default():
     # TODO maybe change this to [...,3]
     # indexing is still problematic, due to memory issues.
     index = tf.placeholder(tf.int32, shape=[None, 2], name='index')
+    pred = tf.placeholder(tf.bool)
     
     pn = PixelNet('./data/vgg16.npy')
 
-    logits, y = pn.run(images=images, labels=labels, index=index, num_classes=n_classes)
-
-    result = tf.argmax(logits, 1)
+    logits, y = pn.run(images=images, labels=labels, index=index, num_classes=n_classes, pred=pred)
+    
+    result = tf.argmax(logits, 2)
 
     y = tf.one_hot(y, n_classes)
+    
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logits)
     loss = tf.reduce_mean(cross_entropy)
 
@@ -255,33 +221,34 @@ with tf.Graph().as_default():
     for step in range(n_steps):
         # samples pixels new for each epoch
         idx = np.random.choice(224 * 224, size=pixel_sample_size, replace=False).reshape(pixel_sample_size, 1)
-        idx = np.concatenate((idx / 224, idx % 224), axis=1).astype(np.int)
         
-        feed_dict = {images: train_x, labels: train_y, index: idx}
+        #multiplication by 0.7 is workaround, mentioned in commit message
+        idx = np.concatenate((idx / 224 * 0.7, idx % 224), axis=1).astype(np.int)
+        
+        feed_dict = {images: train_x, labels: train_y, index: idx, pred: False}
 
-        _, loss_value = sess.run([train_op, loss],
+        _, loss_value, res = sess.run([train_op, loss, result],
                                       feed_dict=feed_dict)
         
         print('step %d - loss: %.2f' % (step, loss_value))
 
+        
     # ------------------------------------------------------------------------
 
     # simple visualization of training result if n_images = 1
     pixel_sample_size = 224 * 224
     idx = np.random.choice(224 * 224, size=pixel_sample_size, replace=False).reshape(pixel_sample_size, 1)
     idx = np.concatenate((idx / 224, idx % 224), axis=1).astype(np.int)
+    
 
-    feed_dict = {images: train_x, labels: train_y, index: idx}
-    _, loss_value, res = sess.run([train_op, loss, result],
-                                  feed_dict=feed_dict)
-
+    feed_dict = {images: train_x, labels: train_y, index: idx, pred: True}
+    res = sess.run([result], feed_dict=feed_dict)
+    res = res[0]
+    
     test = np.full((224, 224, 3), 255)
-    out = np.full((224, 224, 1), 255)
     for k in range(0, len(idx)):
-        test[idx[k, 0], idx[k, 1], 0] = res[0][k] / 30.0 * 255
+        test[idx[k, 0], idx[k, 1], 0] = res[0][k] / 27.0 * 255
         test[idx[k, 0], idx[k, 1], 1] = 0
         test[idx[k, 0], idx[k, 1], 2] = 0
-        
-        out[idx[k, 0], idx[k, 1]] = res[0][k]
 
     csh.displayImage(np.concatenate((train_x[0], test), axis=0).astype(np.uint8))
