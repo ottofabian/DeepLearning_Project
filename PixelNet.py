@@ -4,6 +4,8 @@ from PIL import Image
 
 from CityscapesHandler import CityscapesHandler
 
+np.set_printoptions(threshold=np.inf)
+
 def interpolate_bipolar(I, C):    
     top_left = tf.cast(tf.floor(C), tf.int32)
     top_right = tf.cast(tf.concat([tf.floor(C[:, 0:1]), tf.ceil(C[:, 1:2])], 1), tf.int32)
@@ -39,7 +41,6 @@ def interpolate_bipolar(I, C):
     return interpolated_result
     
 
-#implementation for multiple feature maps
 def get_values_at_coordinates(input, coordinates):
     input_as_vector = tf.reshape(input, [input.shape[0], -1, input.shape[3]])
     coordinates_as_indices = (coordinates[:, 0] * tf.shape(input)[1]) + coordinates[:, 1]    
@@ -54,14 +55,13 @@ class PixelNet:
         
     def sample_sparse(self, features, index):
         samples = []
-                          
+        
         for f in features:
             idx_scaled = index / features[0].shape[1]
-            idx_scaled = tf.cast(idx_scaled, dtype=tf.float32) * tf.cast(f.shape[1], dtype=tf.float32)                          
+            idx_scaled = tf.cast(idx_scaled, dtype=tf.float32) * (tf.cast(f.shape[1], dtype=tf.float32) - 1)
             samples.append(interpolate_bipolar(f, idx_scaled))
 
-        vector = tf.concat(samples, axis=-1)
-        return vector
+        return tf.concat(samples, axis=-1)
     
     
     def sample_dense(self, features, index):
@@ -70,23 +70,25 @@ class PixelNet:
         
         for i in range(1, len(features)):
             upsampled.append(tf.image.resize_bilinear(features[i], shape))
-
-        label = tf.transpose(tf.gather_nd(tf.transpose(labels, [1,2,0,3]), index), [1,0,2])
-        sampled = [tf.transpose(tf.gather_nd(tf.transpose(feature, [1,2,0,3]), index), [1,0,2]) for feature in upsampled]
-        vector = tf.concat(sampled, axis=-1)
         
-        return vector
+        sampled = [tf.transpose(tf.gather_nd(tf.transpose(feature, [1,2,0,3]), index), [1,0,2]) for feature in upsampled]
+       
+        return tf.concat(sampled, axis=-1)
         
         
     def random_sampling(self, features, labels, index, pred):
         with tf.name_scope('RandomSampling'):        
-                
+        
+        
             if index is None:
                 vector = tf.concat(upsampled, axis=-1)
                 label = None
             else:
-                label = tf.transpose(tf.gather_nd(tf.transpose(labels, [1, 2, 0, 3]), index), [1, 0, 2])                
+                #index = tf.Print(index, [index], message="index", summarize = 200) 
+                label = tf.transpose(tf.gather_nd(tf.transpose(labels, [1, 2, 0]), index), [1, 0]) 
+                #label = tf.Print(label, [label], message="label", summarize = 200)             
                 vector = tf.cond(pred, lambda: self.sample_dense(features, index), lambda: self.sample_sparse(features, index))
+                
                 
         return vector, label
 
@@ -140,7 +142,7 @@ class PixelNet:
         features.append(self.conv7_1)
 
         # sampling layer
-        x, y = self.random_sampling(features, labels, index, pred)        
+        x, y = self.random_sampling(features, labels, index, pred)
         
         with tf.name_scope('MLP'):
             x = tf.layers.dropout(x, 0.5, name='dropout1')
@@ -181,18 +183,18 @@ class PixelNet:
 
 
 n_images = 1
-n_steps = 5
+n_steps = 50
 n_classes = 27
 pixel_sample_size = 2000
 
 csh = CityscapesHandler()
 train_x, train_y = csh.getTrainSet(n_images)
-train_y = train_y[:, :, :, None]
+
 
 
 with tf.Graph().as_default():
     images = tf.placeholder(tf.float32, shape=[n_images, 224, 224, 3], name='images')
-    labels = tf.placeholder(tf.int32, shape=[n_images, 224, 224, 1], name='labels')
+    labels = tf.placeholder(tf.int32, shape=[n_images, 224, 224], name='labels')
     
     # TODO maybe change this to [...,3]
     # indexing is still problematic, due to memory issues.
@@ -202,10 +204,16 @@ with tf.Graph().as_default():
     pn = PixelNet('./data/vgg16.npy')
 
     logits, y = pn.run(images=images, labels=labels, index=index, num_classes=n_classes, pred=pred)
+
+    #logits = tf.Print(logits, [logits], message="logits", summarize=2000)
     
     result = tf.argmax(logits, 2)
-
+    
+    #y = tf.Print(y, [logits[0][0]], message="result", summarize = 20000)
+    
     y = tf.one_hot(y, n_classes)
+    
+    #y = tf.Print(y, [y[0][0]], message="y      ", summarize = 20000)
     
     cross_entropy = tf.nn.softmax_cross_entropy_with_logits_v2(labels=y, logits=logits)
     loss = tf.reduce_mean(cross_entropy)
@@ -218,12 +226,11 @@ with tf.Graph().as_default():
 
     sess.run(init)
 
+    test = np.full((224, 224, 3), 255)
     for step in range(n_steps):
         # samples pixels new for each epoch
         idx = np.random.choice(224 * 224, size=pixel_sample_size, replace=False).reshape(pixel_sample_size, 1)
-        
-        #multiplication by 0.7 is workaround, mentioned in commit message
-        idx = np.concatenate((idx / 224 * 0.7, idx % 224), axis=1).astype(np.int)
+        idx = np.concatenate((idx / 224, idx % 224), axis=1).astype(np.int)
         
         feed_dict = {images: train_x, labels: train_y, index: idx, pred: False}
 
@@ -231,8 +238,19 @@ with tf.Graph().as_default():
                                       feed_dict=feed_dict)
         
         print('step %d - loss: %.2f' % (step, loss_value))
-
         
+            
+        for k in range(0, len(idx)):
+            test[idx[k, 0], idx[k, 1], 0] = res[0][k] / 27.0 * 255
+            test[idx[k, 0], idx[k, 1], 1] = 0
+            test[idx[k, 0], idx[k, 1], 2] = 0
+
+        #csh.displayImage(np.concatenate((train_x[0], test), axis=0).astype(np.uint8))
+
+      
+
+
+    quit()
     # ------------------------------------------------------------------------
 
     # simple visualization of training result if n_images = 1
