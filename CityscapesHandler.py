@@ -49,7 +49,7 @@ class CityscapesHandler(object):
         for dirName, subdirList, fileList in os.walk(x_root):
             for fname in fileList:
                 img = Image.open(dirName + "/" + fname)
-                
+                # print(dirName + "/" + fname)
                 if(asGreyScale):
                     img = img.convert("L")
                 
