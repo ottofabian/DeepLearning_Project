@@ -12,7 +12,7 @@ import numpy as np
 
 x_data_root = "./data/leftImg8bit"
 labels_data_root = "./data/gtFine"
-default_image_shape = (320, 160)
+default_image_shape = (224, 224)
 useTrainingLabels = False
 
 class CityscapesHandler(object):
@@ -49,7 +49,7 @@ class CityscapesHandler(object):
         for dirName, subdirList, fileList in os.walk(x_root):
             for fname in fileList:
                 img = Image.open(dirName + "/" + fname)
-                # print(dirName + "/" + fname)
+                
                 if(asGreyScale):
                     img = img.convert("L")
                 
