@@ -15,30 +15,30 @@ def draw_results(image, idx, res):
             image[k, i, 0] = 0
             image[k, i, 1] = 0
             image[k, i, 2] = 0
-            if(res[k * w + i] < 9):
-                image[k, i, 0] = res[k * w + i] / 9.0 * 255
-            elif(res[k * w + i] < 18):
-                image[k, i, 1] = res[k * w + i] / 9.0 * 255
+            if(res[k * w + i] < 10):
+                image[k, i, 0] = res[k * w + i] / 10.0 * 255
+            elif(res[k * w + i] < 20):
+                image[k, i, 1] = res[k * w + i] / 10.0 * 255
             else:
-                image[k, i, 2] = res[k * w + i] / 9.0 * 255
+                image[k, i, 2] = res[k * w + i] / 10.0 * 255
     
     return image
     
-    
-n_images = 1
+img_idx = 3
 n_classes = 30
 input_image_shape = (224, 224) #(width, height)
 model_path = os.path.dirname('./model/checkpoint')
 
 
 csh = CityscapesHandler()
-train_x, train_y = csh.getTrainSet(n_images, shape=input_image_shape)
+train_x, train_y = csh.getTrainSet(img_idx + 1, shape=input_image_shape)
+train_x, train_y = train_x[img_idx, None], train_y[img_idx, None]
 train_y = train_y[:, :, :, None]
 input_image_shape = train_x[0].shape
 
 
 with tf.Graph().as_default():
-    images = tf.placeholder(tf.float32, shape=[None, input_image_shape[0], input_image_shape[1], 3], name='images')
+    images = tf.placeholder(tf.float32, shape=[1, input_image_shape[0], input_image_shape[1], 3], name='images')
 
     
     #preprocess

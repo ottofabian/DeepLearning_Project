@@ -4,7 +4,25 @@ import tensorflow.contrib.slim as slim
 
 from vgg16 import vgg_16
 
-class PixelNet:  
+class PixelNet:
+
+    def generate_sample_idxs(self, input_image_shape, n_images, pixel_sample_size):
+        idx = np.empty((0, 3))
+        for k in range(n_images):
+            pxl_idx = np.random.choice(input_image_shape[0] * input_image_shape[1], size=pixel_sample_size, replace=False).reshape(pixel_sample_size, 1)
+            pxl_idx = np.concatenate((pxl_idx / input_image_shape[1], pxl_idx % input_image_shape[1]), axis=1).astype(np.int)
+            img_idx = np.full(pixel_sample_size, k)
+            comb = np.insert(pxl_idx, 0, img_idx, axis=1)
+            idx = np.append(idx, comb, axis=0)
+        return idx.astype(np.int)
+        
+        
+    def preprocess_images(self, images):
+        r, g, b = tf.split(axis=3, num_or_size_splits=3, value=images)
+        VGG_MEAN = [103.939, 116.779, 123.68]
+        return tf.concat(values=[b - VGG_MEAN[0], g - VGG_MEAN[1], r - VGG_MEAN[2]], axis=3)
+              
+  
     def interpolate_bilinear(self, I, C):    
         top_left = tf.cast(tf.floor(C), tf.int32)
         top_right = tf.cast(tf.concat([C[:, 0:1], tf.floor(C[:, 1:2]), tf.ceil(C[:, 2:3])], 1), tf.int32)
@@ -75,7 +93,7 @@ class PixelNet:
             return vector, label
 
 
-    def run(self, images, num_classes, labels=None, index=None):
+    def build(self, images, num_classes, labels=None, index=None):
         with tf.name_scope('PixelNet'):
             
             out, layers_out = vgg_16(images,
