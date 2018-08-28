@@ -8,15 +8,15 @@ from PixelNet import PixelNet
 path_vgg16_vars = "./data/vgg_16.ckpt" #downloadable at https://github.com/tensorflow/models/tree/master/research/slim
 model_save_path = "./model/pixelnet"
 
-n_train_images = -1  # -1 to read all train images
-n_val_images = -1    # -1 to read all val images
+n_train_images = 2975  # max: 2975
+n_val_images = 500    # max: 500
 size_batch = 5
 n_batches = int(n_train_images / size_batch)
 n_steps = 150
 n_classes = 30
 pixel_sample_size = 2000 # per image
 lr = 0.00003
-input_image_shape = (224, 224) #(width, height)
+input_image_shape = (320, 160) #(width, height)
 valid_after_n_steps = 3
 
 
@@ -91,7 +91,7 @@ with tf.Graph().as_default():
                 idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)            
                 __, loss_value = sess.run([train_op, loss_mean], feed_dict={index: idx})
                 tot_loss += loss_value
-                print("-")
+                print("--batch ", _, "/", n_batches)
             print("step: {}, Loss: {:.4f}".format(step, tot_loss / n_batches))
 
             if(step % valid_after_n_steps == 0):
