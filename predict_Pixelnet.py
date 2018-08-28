@@ -47,8 +47,8 @@ with tf.Graph().as_default():
     bgr = tf.concat(values=[b - VGG_MEAN[0], g - VGG_MEAN[1], r - VGG_MEAN[2]], axis=3)   
     
     pn = PixelNet()
-    logits = pn.run(images=bgr, num_classes=n_classes)
-    result = tf.argmax(logits, 1)
+    logits = pn.build(images=bgr, num_classes=n_classes)
+    predictions = tf.argmax(logits, 1)
 
     #load model
     pixelnet_vars = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES)  
@@ -60,7 +60,7 @@ with tf.Graph().as_default():
     feed_dict = {images: train_x}
 
     print("start prediction")
-    res = sess.run([result], feed_dict=feed_dict)
+    res = sess.run([predictions], feed_dict=feed_dict)
     res = res[0]
 
     print("prediction done - draw results")
