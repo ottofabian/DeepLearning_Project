@@ -118,7 +118,6 @@ with tf.Session(graph=graph) as sess:
         for step in range(n_steps):
             print("Epoch {}/{}".format(step + 1, n_steps))
             for batch_step in range(n_batches):
-                print(pixel_sample_size)
                 idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)
                 _, loss_value, _ = sess.run([train_op, loss_mean, iou_op], feed_dict={index: idx})
                 loss_history[step] += loss_value
@@ -132,7 +131,6 @@ with tf.Session(graph=graph) as sess:
                 sess.run([val_init_op], feed_dict={val_images: val_x, val_labels: val_y, batch_size: n_val_images})
 
                 for _ in range(n_validation_batches):
-                    print(pixel_sample_size)
                     idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)
                     loss_value, _ = sess.run([loss_mean, iou_op], feed_dict={index: idx})
                     loss_history_test[step // valid_after_n_steps] += loss_value
