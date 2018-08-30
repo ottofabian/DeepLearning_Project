@@ -10,8 +10,8 @@ from PixelNet import PixelNet
 path_vgg16_vars = "./data/vgg_16.ckpt"  # downloadable at https://github.com/tensorflow/models/tree/master/research/slim
 model_save_path = "./model/pixelnet"
 
-n_train_images = 2  # max: 2975
-n_val_images = 2  # max: 500
+n_train_images = 5  # max: 2975
+n_val_images = 5  # max: 500
 size_batch = 5
 n_batches = int(math.ceil(n_train_images / size_batch))  # if uneven the last few images are trained as well
 n_validation_batches = int(math.ceil(n_val_images / size_batch))
@@ -111,37 +111,33 @@ with tf.Session(graph=graph) as sess:
     iou_history_test = np.zeros((n_steps // valid_after_n_steps + 1,))
 
     print("Training started")
-
     try:
 
         sess.run(train_init_op, feed_dict={train_images: train_x, train_labels: train_y, batch_size: size_batch})
 
         for step in range(n_steps):
-            tot_loss = 0
-            tot_iou = 0
             print("Epoch {}/{}".format(step + 1, n_steps))
             for batch_step in range(n_batches):
+                print(pixel_sample_size)
                 idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)
                 _, loss_value, _ = sess.run([train_op, loss_mean, iou_op], feed_dict={index: idx})
                 loss_history[step] += loss_value
                 print("--batch {}/{}".format(batch_step + 1, n_batches))
 
             loss_history[step] /= n_batches
-            iou_history[step] /= n_batches
 
             print("Training Loss: {:.4f} -- IoU: {:.4f}".format(loss_history[step], sess.run(iou)))
 
             if step % valid_after_n_steps == 0:
                 sess.run([val_init_op], feed_dict={val_images: val_x, val_labels: val_y, batch_size: n_val_images})
 
-                tot_loss = 0
-                tot_iou = 0
                 for _ in range(n_validation_batches):
+                    print(pixel_sample_size)
                     idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)
                     loss_value, _ = sess.run([loss_mean, iou_op], feed_dict={index: idx})
-                    tot_loss += loss_value
+                    loss_history_test[step // valid_after_n_steps] += loss_value
 
-                loss_history_test[step // valid_after_n_steps] = tot_loss / n_validation_batches
+                loss_history_test[step // valid_after_n_steps] /= n_validation_batches
                 iou_history_test[step // valid_after_n_steps] = sess.run(iou)
                 print("Validation Loss: {:.4f} -- IoU: {:.4f}".format(loss_history_test[step // valid_after_n_steps],
                                                                       iou_history_test[step // valid_after_n_steps]))
