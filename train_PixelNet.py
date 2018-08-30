@@ -10,8 +10,8 @@ from PixelNet import PixelNet
 path_vgg16_vars = "./data/vgg_16.ckpt"  # downloadable at https://github.com/tensorflow/models/tree/master/research/slim
 model_save_path = "./model/pixelnet"
 
-n_train_images = 5  # max: 2975
-n_val_images = 5  # max: 500
+n_train_images = 2975  # max: 2975
+n_val_images = 500  # max: 500
 size_batch = 5
 n_batches = int(math.ceil(n_train_images / size_batch))  # if uneven the last few images are trained as well
 n_validation_batches = int(math.ceil(n_val_images / size_batch))
@@ -20,7 +20,7 @@ n_classes = 30
 pixel_sample_size = 10000 // size_batch  # per image
 lr = 1e-5
 input_image_shape = (224, 224)  # (width, height)
-valid_after_n_steps = 1
+valid_after_n_steps = 10
 
 csh = CityscapesHandler()
 train_x, train_y = csh.getTrainSet(n_train_images, shape=input_image_shape)
@@ -124,8 +124,9 @@ with tf.Session(graph=graph) as sess:
                 print("--batch {}/{}".format(batch_step + 1, n_batches))
 
             loss_history[step] /= n_batches
+            iou_history[step] = sess.run(iou)
 
-            print("Training Loss: {:.4f} -- IoU: {:.4f}".format(loss_history[step], sess.run(iou)))
+            print("Training Loss: {:.4f} -- IoU: {:.4f}".format(loss_history[step], iou_history[step]))
 
             if step % valid_after_n_steps == 0:
                 sess.run([val_init_op], feed_dict={val_images: val_x, val_labels: val_y, batch_size: n_val_images})
@@ -164,7 +165,7 @@ with tf.Session(graph=graph) as sess:
 
     plt.figure(0)
     plt.plot(np.arange(1, n_steps + 1), loss_history, label="train")
-    plt.plot(np.arange(1, n_steps + 1, valid_after_n_steps), loss_history_test, label="test")
+    plt.plot(np.arange(1, n_steps + 2, valid_after_n_steps), loss_history_test, label="test")
     plt.title("Loss Progress")
     plt.legend()
     plt.xlabel("Epoch")
@@ -172,7 +173,7 @@ with tf.Session(graph=graph) as sess:
 
     plt.figure(1)
     plt.plot(np.arange(1, n_steps + 1), iou_history, label="train")
-    plt.plot(np.arange(1, n_steps + 1, valid_after_n_steps), iou_history_test, label="test")
+    plt.plot(np.arange(1, n_steps + 2, valid_after_n_steps), iou_history_test, label="test")
     plt.title("IoU Progress")
     plt.legend()
     plt.xlabel("Epoch")
