@@ -1,8 +1,8 @@
 import math
 
-from matplotlib import pyplot as plt
 import numpy as np
 import tensorflow as tf
+from matplotlib import pyplot as plt
 
 from CityscapesHandler import CityscapesHandler
 from PixelNet import PixelNet
@@ -10,8 +10,8 @@ from PixelNet import PixelNet
 path_vgg16_vars = "./data/vgg_16.ckpt"  # downloadable at https://github.com/tensorflow/models/tree/master/research/slim
 model_save_path = "./model/pixelnet"
 
-n_train_images = 2975  # max: 2975
-n_val_images = 500  # max: 500
+n_train_images = 2  # max: 2975
+n_val_images = 2  # max: 500
 size_batch = 5
 n_batches = int(math.ceil(n_train_images / size_batch))  # if uneven the last few images are trained as well
 n_validation_batches = int(math.ceil(n_val_images / size_batch))
@@ -20,7 +20,7 @@ n_classes = 30
 pixel_sample_size = 10000 // size_batch  # per image
 lr = 1e-5
 input_image_shape = (224, 224)  # (width, height)
-valid_after_n_steps = 10
+valid_after_n_steps = 1
 
 csh = CityscapesHandler()
 train_x, train_y = csh.getTrainSet(n_train_images, shape=input_image_shape)
@@ -132,21 +132,18 @@ with tf.Session(graph=graph) as sess:
 
             if step % valid_after_n_steps == 0:
                 sess.run([val_init_op], feed_dict={val_images: val_x, val_labels: val_y, batch_size: n_val_images})
-                
+
                 tot_loss = 0
                 tot_iou = 0
-                for _ in range(n_validation_batches):           
-                    idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)            
+                for _ in range(n_validation_batches):
+                    idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)
                     loss_value, _ = sess.run([loss_mean, iou_op], feed_dict={index: idx})
-                    iou_score = sess.run(iou)
                     tot_loss += loss_value
-                    tot_iou = iou_score
 
-                
                 loss_history_test[step // valid_after_n_steps] = tot_loss / n_validation_batches
-                iou_history_test[step // valid_after_n_steps] = tot_iou / n_validation_batches
-                print("Validation Loss: {:.4f} -- IoU: {:.4f}".format(tot_loss, iou_history_test[
-                    step // valid_after_n_steps]))
+                iou_history_test[step // valid_after_n_steps] = sess.run(iou)
+                print("Validation Loss: {:.4f} -- IoU: {:.4f}".format(loss_history_test[step // valid_after_n_steps],
+                                                                      iou_history_test[step // valid_after_n_steps]))
                 # loss_value = loss_value[0]
 
                 sess.run(train_init_op,
@@ -168,11 +165,11 @@ with tf.Session(graph=graph) as sess:
     print("Saving model")
     saver = tf.train.Saver(pixelnet_vars, save_relative_paths=True)
     save_path = saver.save(sess, "{}_final".format(model_save_path))
-    print("Model saved in path: %s" % save_path)
+    print("Model saved in path: {}".format(save_path))
 
     plt.figure(0)
     plt.plot(np.arange(1, n_steps + 1), loss_history, label="train")
-    plt.plot(np.arange(1, n_steps + 1), loss_history_test, label="test")
+    plt.plot(np.arange(1, n_steps + 1, valid_after_n_steps), loss_history_test, label="test")
     plt.title("Loss Progress")
     plt.legend()
     plt.xlabel("Epoch")
@@ -180,7 +177,7 @@ with tf.Session(graph=graph) as sess:
 
     plt.figure(1)
     plt.plot(np.arange(1, n_steps + 1), iou_history, label="train")
-    plt.plot(np.arange(1, n_steps // valid_after_n_steps + 2), iou_history_test, label="test")
+    plt.plot(np.arange(1, n_steps + 1, valid_after_n_steps), iou_history_test, label="test")
     plt.title("IoU Progress")
     plt.legend()
     plt.xlabel("Epoch")
