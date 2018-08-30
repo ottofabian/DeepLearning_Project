@@ -111,6 +111,7 @@ with tf.Session(graph=graph) as sess:
     iou_history_test = np.zeros((n_steps // valid_after_n_steps + 1,))
 
     print("Training started")
+
     try:
 
         sess.run(train_init_op, feed_dict={train_images: train_x, train_labels: train_y, batch_size: size_batch})
