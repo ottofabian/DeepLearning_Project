@@ -1,4 +1,5 @@
 import math
+import os
 
 import numpy as np
 import tensorflow as tf
@@ -9,13 +10,15 @@ from PixelNet import PixelNet
 
 path_vgg16_vars = "./data/vgg_16.ckpt"  # downloadable at https://github.com/tensorflow/models/tree/master/research/slim
 model_save_path = "./model/pixelnet"
+model_path = os.path.dirname('./model/checkpoint')
+continue_training = True
 
 n_train_images = 2975  # max: 2975
 n_val_images = 500  # max: 500
 size_batch = 5
 n_batches = int(math.ceil(n_train_images / size_batch))  # if uneven the last few images are trained as well
 n_validation_batches = int(math.ceil(n_val_images / size_batch))
-n_steps = 80
+n_steps = 15
 n_classes = 30
 pixel_sample_size = 10000 // size_batch  # per image
 lr = 1e-5
@@ -56,6 +59,9 @@ with graph.as_default():
     train_init_op = iterator.make_initializer(train_dataset)
     val_init_op = iterator.make_initializer(val_dataset)
 
+    del train_dataset
+    del val_dataset
+
     pn = PixelNet()
 
     # preprocess
@@ -95,14 +101,19 @@ with graph.as_default():
 
 with tf.Session(graph=graph) as sess:
     # load VGG model
-    saver = tf.train.Saver(vgg_vars)
-
-    # iou_metric_vars_initializer = tf.variables_initializer(var_list=iou_metric_vars)
-    # sess.run(iou_metric_vars_initializer)
+    saver = tf.train.Saver(pixelnet_vars) if continue_training else tf.train.Saver(vgg_vars)
 
     sess.run(tf.global_variables_initializer())
     sess.run(tf.local_variables_initializer())
-    saver.restore(sess, path_vgg16_vars)
+
+    if continue_training:
+        ckpt = tf.train.get_checkpoint_state(model_path)
+        saver.restore(sess, ckpt.model_checkpoint_path)
+    else:
+        saver.restore(sess, path_vgg16_vars)
+
+    # iou_metric_vars_initializer = tf.variables_initializer(var_list=iou_metric_vars)
+    # sess.run(iou_metric_vars_initializer)
 
     # history container
     loss_history = np.zeros((n_steps,))
@@ -128,6 +139,12 @@ with tf.Session(graph=graph) as sess:
 
             print("Training Loss: {:.4f} -- IoU: {:.4f}".format(loss_history[step], iou_history[step]))
 
+            # save model checkpoint to disk
+            saver = tf.train.Saver(pixelnet_vars, save_relative_paths=True)
+            save_path = saver.save(sess,
+                                   "{}_step_{}_loss_{:.4f}".format(model_save_path, step, loss_history[step]))
+            print("Model checkpoint saved in path: {}".format(save_path))
+
             if step % valid_after_n_steps == 0:
                 sess.run([val_init_op], feed_dict={val_images: val_x, val_labels: val_y, batch_size: n_val_images})
 
@@ -145,11 +162,6 @@ with tf.Session(graph=graph) as sess:
                 sess.run(train_init_op,
                          feed_dict={train_images: train_x, train_labels: train_y, batch_size: size_batch})
 
-                # save model checkpoint to disk
-                saver = tf.train.Saver(pixelnet_vars, save_relative_paths=True)
-                save_path = saver.save(sess,
-                                       "{}_step_{}_loss_{:.4f}".format(model_save_path, step, loss_history[step]))
-                print("Model checkpoint saved in path: {}".format(save_path))
 
     except KeyboardInterrupt:
         # interrupts training process after pressing ctrl+c
