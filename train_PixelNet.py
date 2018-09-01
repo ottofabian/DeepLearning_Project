@@ -59,8 +59,6 @@ with graph.as_default():
     train_init_op = iterator.make_initializer(train_dataset)
     val_init_op = iterator.make_initializer(val_dataset)
 
-    del train_dataset
-    del val_dataset
 
     pn = PixelNet()
 
