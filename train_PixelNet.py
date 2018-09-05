@@ -17,6 +17,10 @@ from tensorflow.python.client import device_lib
 print(device_lib.list_local_devices())
 
 
+def convert(y):
+
+    return
+
 # @run_release_gpu
 def main():
     path_vgg16_vars = "./data/vgg_16.ckpt"  # downloadable at https://github.com/tensorflow/models/tree/master/research/slim
