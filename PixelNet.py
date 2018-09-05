@@ -111,7 +111,7 @@ class PixelNet:
             features.append(layers_out["vgg_16/conv3/conv3_3"])
             features.append(layers_out["vgg_16/conv4/conv4_3"])
             features.append(layers_out["vgg_16/conv5/conv5_3"])
-            features.append(layers_out["vgg_16/dropout7"])
+            features.append(layers_out["vgg_16/fc7"])
 
             x, y = self.random_sampling(features, labels, index)
             with tf.name_scope('MLP'):
