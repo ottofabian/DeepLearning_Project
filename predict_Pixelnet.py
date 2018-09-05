@@ -58,6 +58,9 @@ with tf.Graph().as_default():
 
     print("start prediction")
     res = sess.run([predictions], feed_dict={images: train_x})[0]
+    # TODO make this work
+    # TODO do this for all images
+    # csh.savePrediction(res)
 
     print("prediction done - draw results")
 

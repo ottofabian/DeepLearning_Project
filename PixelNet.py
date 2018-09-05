@@ -65,7 +65,7 @@ class PixelNet:
                 for i in range(1, len(features)):
                     upsampled.append(tf.image.resize_bilinear(features[i], shape))
                 vector = tf.concat(upsampled, axis=-1)
-                vector = tf.reshape(vector, (shape[0] * shape[1], vector.shape[3]))
+                vector = tf.reshape(vector, (vector.shape[0], shape[0] * shape[1], vector.shape[3]))
                 label = None
             else:
                 # decide for one:
@@ -93,12 +93,12 @@ class PixelNet:
 
             return vector, label
 
-    def build(self, images, num_classes, labels=None, index=None):
+    def build(self, images, num_classes, labels=None, index=None, is_training=True):
         with tf.name_scope('PixelNet'):
 
             out, layers_out = vgg_16(images,
                                      num_classes=num_classes,
-                                     is_training=True,
+                                     is_training=is_training,
                                      dropout_keep_prob=0.5,
                                      spatial_squeeze=False,
                                      scope='vgg_16',

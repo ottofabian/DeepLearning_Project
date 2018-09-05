@@ -1,8 +1,6 @@
 import math
 import os
 
-from gpu_release import run_release_gpu
-
 os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 
 import numpy as np
@@ -12,19 +10,10 @@ from matplotlib import pyplot as plt
 from CityscapesHandler import CityscapesHandler
 from PixelNet import PixelNet
 
-from tensorflow.python.client import device_lib
 
-print(device_lib.list_local_devices())
-
-
-def convert(y):
-
-    return
-
-# @run_release_gpu
 def main():
     path_vgg16_vars = "./data/vgg_16.ckpt"  # downloadable at https://github.com/tensorflow/models/tree/master/research/slim
-    model_save_path = "U:/PycharmProjects/models/run2/pixelnet"
+    model_save_path = "U:/PycharmProjects/models/run3/pixelnet"
     model_path = os.path.dirname('U:/PycharmProjects/models/checkpoint')
     continue_training = False
 
@@ -34,12 +23,14 @@ def main():
     n_batches = int(math.ceil(n_train_images / size_batch))  # if uneven the last few images are trained as well
     n_validation_batches = int(math.ceil(n_val_images / size_batch))
     n_steps = 400
-    n_classes = 30
     pixel_sample_size = 10000 // size_batch  # per image
     lr = 1e-5
     input_image_shape = (224, 224)  # (width, height)
     valid_after_n_steps = 1
+
     csh = CityscapesHandler()
+    n_classes = csh.getNumTrainIDLabels() +1
+
     train_x, train_y = csh.getTrainSet(n_train_images, shape=input_image_shape)
     train_y = train_y[:, :, :, None]
 
@@ -200,7 +191,8 @@ def main():
         # save new model to disk
         print("Saving model")
         saver = tf.train.Saver(pixelnet_vars, save_relative_paths=True)
-        save_path = saver.save(sess, "{}_final".format(model_save_path))
+        save_path = saver.save(sess,
+                               "{}_final_loss_{}_iou_{}".format(model_save_path, loss_history[-1], iou_history[-1]))
         print("Model saved in path: {}".format(save_path))
 
         plt.figure(0)
