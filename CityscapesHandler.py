@@ -16,6 +16,12 @@ useTrainingLabels = False
 
 
 class CityscapesHandler(object):
+    def __init__(self):
+        self.trainId2label = labels.trainId2label
+        self.id2label = labels.id2label
+        
+        self.fromLabelIdToTrainId = np.vectorize(self.__fromLabelIdToTrainId, otypes=[np.int])
+        self.fromTrainIdToLabelId = np.vectorize(self.__fromTrainIdToLabelId, otypes=[np.int])
 
     def getNumLabels(self):
         return len(labels.labels) - 1
@@ -125,6 +131,15 @@ class CityscapesHandler(object):
         img = Image.fromarray(image)
         img.format = "PNG"
         img.show()
+        
+    
+    def __fromLabelIdToTrainId(self, id):
+        return self.id2label[id].trainId
+        
+        
+    def __fromTrainIdToLabelId(self, trainId):
+        return self.trainId2label[trainId].id
+    
 
     def savePrediction(self, inputs, image_shape=(224, 224), oversample=True):
 
@@ -174,38 +189,11 @@ class CityscapesHandler(object):
 
 def main():
     csh = CityscapesHandler()
-
-    # label handlers
-    # print(csh.getClassIdFromName("car"))
-    # print(csh.getClassNameFromId(12))
-    # print(csh.getNumLabels())
-
-    test = csh.getImageFromFilename("berlin_000000_000019_gtFine_color.png")
-
-    # 1 hot transformations
-    one_hot = csh.fromLabelIDsTo1hot([1, 2, 4, 5, 6, 6, 6, 7, 3, 2, 5, 5, 5, 0])
-    back_translation = csh.from1hotToLabelIDs(one_hot)
-
-    # read in 5 images of the different datasets
-    train_x, train_y = csh.getTrainSet(5, asGreyScale=True)
-    test_x, test_y = csh.getTestSet(5, asGreyScale=True)
-    val_x, val_y = csh.getValSet(5, asGreyScale=True)
-
-    # #get a numpy array of all read train_images
-    # images = np.array(list(train_set.values()))
-
-    # #print filenames of all loaded train images
-    # print(train_set.keys())
-
-    # display image
-    # csh.displayImage(train_y[0])
-    # print(train_y[0])
-
-    # generate random pixel samples for hypercolumn vectors
-    samples = csh.samplePixels()
-    # print(samples)
-    # print(samples[0][0], samples[0][1])
-
+       
+    test = np.array([1,2,3,4,5,6,7,8,9])
+    
+    print(csh.fromLabelIdToTrainId(test))
+    print(csh.fromTrainIdToLabelId(test))
 
 if __name__ == "__main__":
     main()
