@@ -65,7 +65,7 @@ class PixelNet:
                 for i in range(1, len(features)):
                     upsampled.append(tf.image.resize_bilinear(features[i], shape))
                 vector = tf.concat(upsampled, axis=-1)
-                vector = tf.reshape(vector, (vector.shape[0], shape[0] * shape[1], vector.shape[3]))
+                vector = tf.reshape(vector, (shape[0] * shape[1], vector.shape[3]))
                 label = None
             else:
                 # decide for one:
