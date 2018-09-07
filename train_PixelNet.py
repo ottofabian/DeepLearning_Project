@@ -17,19 +17,19 @@ def main():
     model_path = os.path.dirname('U:/PycharmProjects/models/checkpoint')
     continue_training = False
 
-    n_train_images = 5  # max: 2975
-    n_val_images = 5  # max: 500
+    n_train_images = 2975  # max: 2975
+    n_val_images = 25  # max: 500
     size_batch = 5
     n_batches = int(math.ceil(n_train_images / size_batch))  # if uneven the last few images are trained as well
-    n_validation_batches = int(math.ceil(n_val_images / size_batch))
+    # n_validation_batches = int(math.ceil(n_val_images / size_batch))
     n_steps = 400
-    pixel_sample_size = 50 // size_batch  # per image
+    pixel_sample_size = 10000 // size_batch  # per image
     lr = 1e-5
     input_image_shape = (224, 224)  # (width, height)
-    valid_after_n_steps = 1
+    # valid_after_n_steps = 1
 
     csh = CityscapesHandler()
-    n_classes = csh.getNumTrainIDLabels() - 1
+    n_classes = csh.getNumTrainIDLabels()
 
     train_x, train_y = csh.getTrainSet(n_train_images, shape=input_image_shape)
     train_y = train_y[:, :, :, None]
@@ -37,11 +37,11 @@ def main():
     train_y[train_y == 255] = n_classes - 1
     train_y[train_y == -1] = n_classes - 1
 
-    val_x, val_y = csh.getValSet(n_val_images, shape=input_image_shape)
-    val_y = val_y[:, :, :, None]
+    # val_x, val_y = csh.getValSet(n_val_images, shape=input_image_shape)
+    # val_y = val_y[:, :, :, None]
 
-    val_y[val_y == 255] = n_classes - 1
-    val_y[val_y == -1] = n_classes - 1
+    # val_y[val_y == 255] = n_classes - 1
+    # val_y[val_y == -1] = n_classes - 1
 
     input_image_shape = train_x[0].shape
 
@@ -52,23 +52,23 @@ def main():
         train_labels = tf.placeholder(tf.int32, shape=[None, input_image_shape[0], input_image_shape[1], 1],
                                       name='train_labels')
 
-        val_images = tf.placeholder(tf.float32, shape=[None, input_image_shape[0], input_image_shape[1], 3],
-                                    name='val_images')
-        val_labels = tf.placeholder(tf.int32, shape=[None, input_image_shape[0], input_image_shape[1], 1],
-                                    name='val_labels')
+        # val_images = tf.placeholder(tf.float32, shape=[None, input_image_shape[0], input_image_shape[1], 3],
+        #                             name='val_images')
+        # val_labels = tf.placeholder(tf.int32, shape=[None, input_image_shape[0], input_image_shape[1], 1],
+        #                             name='val_labels')
 
         index = tf.placeholder(tf.int32, shape=[None, 3], name='index')
         batch_size = tf.placeholder(tf.int64)
 
         train_dataset = tf.data.Dataset.from_tensor_slices((train_images, train_labels)).shuffle(
             buffer_size=n_batches).batch(batch_size).repeat()
-        val_dataset = tf.data.Dataset.from_tensor_slices((val_images, val_labels)).batch(batch_size).repeat()
+        # val_dataset = tf.data.Dataset.from_tensor_slices((val_images, val_labels)).batch(batch_size).repeat()
 
         iterator = tf.data.Iterator.from_structure(train_dataset.output_types, train_dataset.output_shapes)
 
         batch_images, batch_labels = iterator.get_next()
         train_init_op = iterator.make_initializer(train_dataset)
-        val_init_op = iterator.make_initializer(val_dataset)
+        # val_init_op = iterator.make_initializer(val_dataset)
 
         pn = PixelNet()
 
@@ -136,8 +136,8 @@ def main():
         # history container
         loss_history = np.zeros((n_steps,))
         iou_history = np.zeros((n_steps,))
-        loss_history_test = np.zeros((n_steps // valid_after_n_steps + 1 if valid_after_n_steps != 1 else n_steps,))
-        iou_history_test = np.zeros((n_steps // valid_after_n_steps + 1 if valid_after_n_steps != 1 else n_steps,))
+        # loss_history_test = np.zeros((n_steps // valid_after_n_steps + 1 if valid_after_n_steps != 1 else n_steps,))
+        # iou_history_test = np.zeros((n_steps // valid_after_n_steps + 1 if valid_after_n_steps != 1 else n_steps,))
 
         print("Training started")
         try:
@@ -170,23 +170,23 @@ def main():
                 except:
                     print("Model could not be saved.")
 
-                if step % valid_after_n_steps == 0:
-                    sess.run([val_init_op], feed_dict={val_images: val_x, val_labels: val_y, batch_size: n_val_images})
+                # if step % valid_after_n_steps == 0:
+                #     sess.run([val_init_op], feed_dict={val_images: val_x, val_labels: val_y, batch_size: n_val_images})
+                #
+                #     for _ in range(n_validation_batches):
+                #         idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)
+                #         loss_value, _ = sess.run([loss_mean, iou_op], feed_dict={index: idx})
+                #         loss_history_test[step // valid_after_n_steps] += loss_value
+                #
+                #     loss_history_test[step // valid_after_n_steps] /= n_validation_batches
+                #     iou_history_test[step // valid_after_n_steps] = sess.run(iou)
+                    # print(
+                    #     "Validation Loss: {:.4f} -- IoU: {:.4f}".format(loss_history_test[step // valid_after_n_steps],
+                    #                                                     iou_history_test[step // valid_after_n_steps]))
+                    # # loss_value = loss_value[0]
 
-                    for _ in range(n_validation_batches):
-                        idx = pn.generate_sample_idxs(input_image_shape, size_batch, pixel_sample_size)
-                        loss_value, _ = sess.run([loss_mean, iou_op], feed_dict={index: idx})
-                        loss_history_test[step // valid_after_n_steps] += loss_value
-
-                    loss_history_test[step // valid_after_n_steps] /= n_validation_batches
-                    iou_history_test[step // valid_after_n_steps] = sess.run(iou)
-                    print(
-                        "Validation Loss: {:.4f} -- IoU: {:.4f}".format(loss_history_test[step // valid_after_n_steps],
-                                                                        iou_history_test[step // valid_after_n_steps]))
-                    # loss_value = loss_value[0]
-
-                    sess.run(train_init_op,
-                             feed_dict={train_images: train_x, train_labels: train_y, batch_size: size_batch})
+                    # sess.run(train_init_op,
+                    #          feed_dict={train_images: train_x, train_labels: train_y, batch_size: size_batch})
 
         except KeyboardInterrupt:
             # interrupts training process after pressing ctrl+c
@@ -203,7 +203,7 @@ def main():
 
         plt.figure(0)
         plt.plot(np.arange(1, n_steps + 1), loss_history, label="train")
-        plt.plot(np.arange(1, loss_history_test.shape[0] + 1), loss_history_test, label="test")
+        # plt.plot(np.arange(1, loss_history_test.shape[0] + 1), loss_history_test, label="test")
         plt.title("Loss Progress")
         plt.legend()
         plt.xlabel("Epoch")
@@ -211,7 +211,7 @@ def main():
 
         plt.figure(1)
         plt.plot(np.arange(1, n_steps + 1), iou_history, label="train")
-        plt.plot(np.arange(1, iou_history_test.shape[0] + 1), iou_history_test, label="test")
+        # plt.plot(np.arange(1, iou_history_test.shape[0] + 1), iou_history_test, label="test")
         plt.title("IoU Progress")
         plt.legend()
         plt.xlabel("Epoch")

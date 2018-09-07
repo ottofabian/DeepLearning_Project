@@ -174,8 +174,8 @@ class CityscapesHandler(object):
     def savePrediction(self, image, filename, image_shape=(224, 224)):
 
         image = self.fromTrainIdToLabelId(image)
-        image = np.repeat(image[:, :, np.newaxis], 3, axis=2).astype(np.uint8)
-        image = Image.fromarray(image)
+        # image = np.repeat(image[:, :, np.newaxis], 3, axis=2).astype(np.uint8)
+        image = Image.fromarray(image.astype(np.uint8))
 
         image = image.resize(image_shape)
 
