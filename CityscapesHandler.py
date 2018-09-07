@@ -11,7 +11,9 @@ import numpy as np
 
 x_data_root = "./data/leftImg8bit"
 labels_data_root = "./data/gtFine"
+prediction_save_path = "./data/results"
 default_image_shape = (224, 224)
+original_image_shape = (2048, 1024)
 useTrainingLabels = False
 
 
@@ -22,12 +24,13 @@ class CityscapesHandler(object):
         
         self.fromLabelIdToTrainId = np.vectorize(self.__fromLabelIdToTrainId, otypes=[np.int])
         self.fromTrainIdToLabelId = np.vectorize(self.__fromTrainIdToLabelId, otypes=[np.int])
+        self.getColorFromLabelId = np.vectorize(self.__getColorFromLabelId, otypes=[np.int])
 
     def getNumLabels(self):
         return len(labels.labels) - 1
 
     def getNumTrainIDLabels(self):
-        return len(labels.trainId2label.keys())
+        return len(labels.trainId2label.keys()) - 1
 
     def getClassNameFromId(self, class_id):
         return labels.id2label[class_id].name
@@ -39,9 +42,12 @@ class CityscapesHandler(object):
         return csHelpers.getCsFileInfo(filename)
 
     def getDataset(self, setType, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False,
-                   trainids=True):
+                   trainids=True, withFilenames=False):
         x = []
         y = []
+        
+        listFilenames = []
+        listFilenamesLabels = []
 
         x_root = x_data_root + "/" + setType.lower()
         y_root = labels_data_root + "/" + setType.lower()
@@ -62,6 +68,7 @@ class CityscapesHandler(object):
                 img = img.resize(shape)
                 # x[csHelpers.getCoreImageFileName(fname)] = np.array(img)
                 x.append(np.array(img))
+                listFilenames.append(fname)
                 counter += 1
 
                 if counter == maxNum:
@@ -82,6 +89,7 @@ class CityscapesHandler(object):
                     img = img.resize(shape)
                     # x[csHelpers.getCoreImageFileName(fname)] = np.array(img)
                     y.append(np.array(img))
+                    listFilenamesLabels.append(fname)
                     counter += 1
 
                     if counter == maxNum:
@@ -91,16 +99,20 @@ class CityscapesHandler(object):
                 break
 
         print(str(counter) + " images with shape " + str(shape) + " read for " + setType + "_set.")
-        return np.array(x), np.array(y)
+        
+        if(withFilenames):
+            return np.array(x), np.array(y), listFilenames, listFilenamesLabels
+        else:
+            return np.array(x), np.array(y)
 
-    def getTrainSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False):
-        return self.getDataset("train", maxNum, specificCity, shape, asGreyScale)
+    def getTrainSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False, withFilenames=False):
+        return self.getDataset("train", maxNum, specificCity, shape, asGreyScale, withFilenames=withFilenames)
 
-    def getTestSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False):
-        return self.getDataset("test", maxNum, specificCity, shape, asGreyScale)
+    def getTestSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False, withFilenames=False):
+        return self.getDataset("test", maxNum, specificCity, shape, asGreyScale, withFilenames=withFilenames)
 
-    def getValSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False):
-        return self.getDataset("val", maxNum, specificCity, shape, asGreyScale)
+    def getValSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False, withFilenames=False):
+        return self.getDataset("val", maxNum, specificCity, shape, asGreyScale, withFilenames=withFilenames)
 
     def evaluateResults(self, predictions, groundTruths):
         pass
@@ -139,61 +151,44 @@ class CityscapesHandler(object):
         
     def __fromTrainIdToLabelId(self, trainId):
         return self.trainId2label[trainId].id
+        
+        
+    def __getColorFromLabelId(self, id):
+        return self.id2label[id].color
+        
+        
+    def fromInputFilenamesToPredictionFilenames(self, filenames):
+        predictionFilenames = []
+        
+        for name in filenames:
+            name = name.split("_")
+            predictionFilenames.append(name[0] + "_" + name[1] + "_" + name[2] + "_" + "prediction.png")
+            
+        for e in predictionFilenames:
+            print(e)
+        
+        return predictionFilenames
     
 
-    def savePrediction(self, inputs, image_shape=(224, 224), oversample=True):
+    def savePrediction(self, image, filename, image_shape=(224, 224), oversample=True):
 
-        # input_ = np.zeros((len(inputs),
-        #                    image_shape[0],
-        #                    image_shape[1],
-        #                    inputs[0].shape[2]),
-        #                   dtype=np.float32)
-        #
-        # for ix, in_ in enumerate(inputs):
-        #     input_[ix] = resize_image(in_, self.image_dims)
-        #
-        # if oversample:
-        #     # Generate center, corner, and mirrored crops.
-        #     input_ = np.oversample(input_, self.crop_dims)
-        # else:
-        #     # Take center crop.
-        #     center = np.array(self.image_dims) / 2.0
-        #     crop = np.tile(center, (1, 2))[0] + np.concatenate([
-        #         -self.crop_dims / 2.0,
-        #         self.crop_dims / 2.0
-        #     ])
-        #     input_ = input_[:, crop[0]:crop[2], crop[1]:crop[3], :]
-        #
-        # # Classify
-        # caffe_in = np.zeros(np.array(input_.shape)[[0, 3, 1, 2]],
-        #                     dtype=np.float32)
-        # for ix, in_ in enumerate(input_):
-        #     caffe_in[ix] = self.transformer.preprocess(self.inputs[0], in_)
-        # out = self.forward_all(**{self.inputs[0]: caffe_in})
-        # predictions = out[self.outputs[0]]
-        #
-        # # For oversampling, average predictions across crops.
-        # if oversample:
-        #     predictions = predictions.reshape((len(predictions) / 10, 10, -1))
-        #     predictions = predictions.mean(1)
-        #
-        # return predictions
-        #
-        #
-        # for img in predictions:
-        #     img = Image.fromarray(img)
-        #     # Needs to be save in ./results/Bremen/xxxx (or whatever)
-        #     img.save('./results', format='PNG')
-        pass
-
+        image = self.fromTrainIdToLabelId(image)
+        image = Image.fromarray(image)
+        
+        image = image.resize(image_shape)
+        
+        image.save(prediction_save_path + "/" + filename)
+       
 
 def main():
     csh = CityscapesHandler()
        
-    test = np.array([1,2,3,4,5,6,7,8,9])
+    test = np.array([255])
     
-    print(csh.fromLabelIdToTrainId(test))
-    print(csh.fromTrainIdToLabelId(test))
+    a = csh.fromTrainIdToLabelId(test)
+    
+    r, g, b = csh.getColorFromLabelId(a[0])
+    print(r,g,b)
 
 if __name__ == "__main__":
     main()

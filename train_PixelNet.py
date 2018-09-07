@@ -17,25 +17,32 @@ def main():
     model_path = os.path.dirname('U:/PycharmProjects/models/checkpoint')
     continue_training = False
 
-    n_train_images = 2975  # max: 2975
-    n_val_images = 25  # max: 500
+    n_train_images = 5  # max: 2975
+    n_val_images = 5  # max: 500
     size_batch = 5
     n_batches = int(math.ceil(n_train_images / size_batch))  # if uneven the last few images are trained as well
     n_validation_batches = int(math.ceil(n_val_images / size_batch))
     n_steps = 400
-    pixel_sample_size = 10000 // size_batch  # per image
+    pixel_sample_size = 50 // size_batch  # per image
     lr = 1e-5
     input_image_shape = (224, 224)  # (width, height)
     valid_after_n_steps = 1
 
     csh = CityscapesHandler()
-    n_classes = csh.getNumTrainIDLabels() +1
+    n_classes = csh.getNumTrainIDLabels() - 1
 
+    
     train_x, train_y = csh.getTrainSet(n_train_images, shape=input_image_shape)
     train_y = train_y[:, :, :, None]
+        
+    train_y[train_y == 255] = n_classes - 1
+    train_y[train_y == -1] = n_classes - 1
 
     val_x, val_y = csh.getValSet(n_val_images, shape=input_image_shape)
-    val_y = val_y[:, :, :, None]
+    val_y = val_y[:, :, :, None] 
+        
+    val_y[val_y == 255] = n_classes - 1
+    val_y[val_y == -1] = n_classes - 1
 
     input_image_shape = train_x[0].shape
 
