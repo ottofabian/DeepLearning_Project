@@ -13,7 +13,7 @@ from PixelNet import PixelNet
 
 def main():
     path_vgg16_vars = "./data/vgg_16.ckpt"  # downloadable at https://github.com/tensorflow/models/tree/master/research/slim
-    model_save_path = "U:/PycharmProjects/models/run3/pixelnet"
+    model_save_path = "U:/PycharmProjects/models/run4/pixelnet"
     model_path = os.path.dirname('U:/PycharmProjects/models/checkpoint')
     continue_training = False
 
@@ -31,16 +31,15 @@ def main():
     csh = CityscapesHandler()
     n_classes = csh.getNumTrainIDLabels() - 1
 
-    
     train_x, train_y = csh.getTrainSet(n_train_images, shape=input_image_shape)
     train_y = train_y[:, :, :, None]
-        
+
     train_y[train_y == 255] = n_classes - 1
     train_y[train_y == -1] = n_classes - 1
 
     val_x, val_y = csh.getValSet(n_val_images, shape=input_image_shape)
-    val_y = val_y[:, :, :, None] 
-        
+    val_y = val_y[:, :, :, None]
+
     val_y[val_y == 255] = n_classes - 1
     val_y[val_y == -1] = n_classes - 1
 

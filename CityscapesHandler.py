@@ -21,7 +21,7 @@ class CityscapesHandler(object):
     def __init__(self):
         self.trainId2label = labels.trainId2label
         self.id2label = labels.id2label
-        
+
         self.fromLabelIdToTrainId = np.vectorize(self.__fromLabelIdToTrainId, otypes=[np.int])
         self.fromTrainIdToLabelId = np.vectorize(self.__fromTrainIdToLabelId, otypes=[np.int])
         self.getColorFromLabelId = np.vectorize(self.__getColorFromLabelId, otypes=[np.int])
@@ -45,7 +45,7 @@ class CityscapesHandler(object):
                    trainids=True, withFilenames=False):
         x = []
         y = []
-        
+
         listFilenames = []
         listFilenamesLabels = []
 
@@ -99,19 +99,22 @@ class CityscapesHandler(object):
                 break
 
         print(str(counter) + " images with shape " + str(shape) + " read for " + setType + "_set.")
-        
-        if(withFilenames):
+
+        if (withFilenames):
             return np.array(x), np.array(y), listFilenames, listFilenamesLabels
         else:
             return np.array(x), np.array(y)
 
-    def getTrainSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False, withFilenames=False):
+    def getTrainSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False,
+                    withFilenames=False):
         return self.getDataset("train", maxNum, specificCity, shape, asGreyScale, withFilenames=withFilenames)
 
-    def getTestSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False, withFilenames=False):
+    def getTestSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False,
+                   withFilenames=False):
         return self.getDataset("test", maxNum, specificCity, shape, asGreyScale, withFilenames=withFilenames)
 
-    def getValSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False, withFilenames=False):
+    def getValSet(self, maxNum=-1, specificCity="all", shape=default_image_shape, asGreyScale=False,
+                  withFilenames=False):
         return self.getDataset("val", maxNum, specificCity, shape, asGreyScale, withFilenames=withFilenames)
 
     def evaluateResults(self, predictions, groundTruths):
@@ -143,52 +146,52 @@ class CityscapesHandler(object):
         img = Image.fromarray(image)
         img.format = "PNG"
         img.show()
-        
-    
+
     def __fromLabelIdToTrainId(self, id):
         return self.id2label[id].trainId
-        
-        
+
     def __fromTrainIdToLabelId(self, trainId):
-        return self.trainId2label[trainId].id
-        
-        
+        try:
+            return self.trainId2label[trainId].id
+        except KeyError:
+            return trainId
+
     def __getColorFromLabelId(self, id):
         return self.id2label[id].color
-        
-        
+
     def fromInputFilenamesToPredictionFilenames(self, filenames):
         predictionFilenames = []
-        
+
         for name in filenames:
             name = name.split("_")
             predictionFilenames.append(name[0] + "_" + name[1] + "_" + name[2] + "_" + "prediction.png")
-            
+
         for e in predictionFilenames:
             print(e)
-        
-        return predictionFilenames
-    
 
-    def savePrediction(self, image, filename, image_shape=(224, 224), oversample=True):
+        return predictionFilenames
+
+    def savePrediction(self, image, filename, image_shape=(224, 224)):
 
         image = self.fromTrainIdToLabelId(image)
+        image = np.repeat(image[:, :, np.newaxis], 3, axis=2).astype(np.uint8)
         image = Image.fromarray(image)
-        
+
         image = image.resize(image_shape)
-        
+
         image.save(prediction_save_path + "/" + filename)
-       
+
 
 def main():
     csh = CityscapesHandler()
-       
+
     test = np.array([255])
-    
+
     a = csh.fromTrainIdToLabelId(test)
-    
+
     r, g, b = csh.getColorFromLabelId(a[0])
-    print(r,g,b)
+    print(r, g, b)
+
 
 if __name__ == "__main__":
     main()

@@ -1,6 +1,7 @@
 import data.cityscapesscripts.evaluation.evalPixelLevelSemanticLabeling as eval
 import os
 
+from data.cityscapesscripts.helpers.csHelpers import printError
 
 args = eval.args
 
