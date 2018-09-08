@@ -1,7 +1,7 @@
 import math
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "1"
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import numpy as np
 import tensorflow as tf
@@ -18,13 +18,13 @@ def main():
     continue_training = False
 
     n_train_images = 2975  # max: 2975
-    n_val_images = 25  # max: 500
+    # n_val_images = 25  # max: 500
     size_batch = 5
     n_batches = int(math.ceil(n_train_images / size_batch))  # if uneven the last few images are trained as well
     # n_validation_batches = int(math.ceil(n_val_images / size_batch))
     n_steps = 400
     pixel_sample_size = 10000 // size_batch  # per image
-    lr = 1e-5
+    lr = 1e-5/3
     input_image_shape = (224, 224)  # (width, height)
     # valid_after_n_steps = 1
 
@@ -209,6 +209,8 @@ def main():
         plt.xlabel("Epoch")
         plt.ylabel("Loss")
 
+        plt.savefig("Loss2.png")
+
         plt.figure(1)
         plt.plot(np.arange(1, n_steps + 1), iou_history, label="train")
         # plt.plot(np.arange(1, iou_history_test.shape[0] + 1), iou_history_test, label="test")
@@ -216,6 +218,7 @@ def main():
         plt.legend()
         plt.xlabel("Epoch")
         plt.ylabel("IoU")
+        plt.savefig("IOU2.png")
 
         plt.show()
 
