@@ -5,14 +5,13 @@ from data.cityscapesscripts.helpers.csHelpers import printError
 
 args = eval.args
 
-#image filter
+# image filter
 args.groundTruthSearch = os.path.join(args.cityscapesPath, "gtFine", "val", "*", "*_gtFine_labelIds.png")
 
 groundTruthImgList = eval.glob.glob(args.groundTruthSearch)
 
-#only first 5 images of val set (example)
-groundTruthImgList = groundTruthImgList[:5]
-
+# only first 5 images of val set (example)
+groundTruthImgList = groundTruthImgList
 
 predictionImgList = []
 
@@ -23,9 +22,7 @@ if not groundTruthImgList:
 for gt in groundTruthImgList:
     predictionImgList.append(eval.getPrediction(args, gt))
 
-
     # evaluate
 eval.evaluateImgLists(predictionImgList, groundTruthImgList, args)
-
 
 quit()

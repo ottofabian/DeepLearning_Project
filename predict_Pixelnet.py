@@ -1,5 +1,7 @@
 import os
 
+os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+
 import numpy as np
 import tensorflow as tf
 
@@ -7,8 +9,8 @@ from CityscapesHandler import CityscapesHandler
 from PixelNet import PixelNet
 
 csh = CityscapesHandler()
-n_images = 5
-n_classes = csh.getNumTrainIDLabels() + 2
+n_images = 500  # max 500
+n_classes = csh.getNumTrainIDLabels()
 input_image_shape = (224, 224)  # (width, height)
 model_path = os.path.dirname('./model/checkpoint')
 

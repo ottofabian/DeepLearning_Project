@@ -194,12 +194,15 @@ def main():
 
         print("Training done")
 
-        # save new model to disk
-        print("Saving model")
-        saver = tf.train.Saver(pixelnet_vars, save_relative_paths=True)
-        save_path = saver.save(sess,
-                               "{}_final_loss_{}_iou_{}".format(model_save_path, loss_history[-1], iou_history[-1]))
-        print("Model saved in path: {}".format(save_path))
+        try:
+            # save new model to disk
+            print("Saving model")
+            saver = tf.train.Saver(pixelnet_vars, save_relative_paths=True)
+            save_path = saver.save(sess,
+                                   "{}_final_loss_{}_iou_{}".format(model_save_path, loss_history[-1], iou_history[-1]))
+            print("Model saved in path: {}".format(save_path))
+        except:
+            print("Model could not be saved.")
 
         plt.figure(0)
         plt.plot(np.arange(1, n_steps + 1), loss_history, label="train")
