@@ -142,10 +142,11 @@ class CityscapesHandler(object):
 
         return np.array(result)
 
-    def displayImage(self, image):
+    def displayImage(self, image, filename):
         img = Image.fromarray(image)
         img.format = "PNG"
-        img.show()
+        img.save("./data/evaluationResults/" + filename)
+        # img.show()
 
     def __fromLabelIdToTrainId(self, id):
         return self.id2label[id].trainId
@@ -179,7 +180,7 @@ class CityscapesHandler(object):
 
         image = image.resize(image_shape)
 
-        image.save(prediction_save_path + "/" + filename)
+        image.save("D:/results/" + filename)
 
 
 def main():

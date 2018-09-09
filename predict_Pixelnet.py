@@ -1,6 +1,6 @@
 import os
 
-os.environ["CUDA_VISIBLE_DEVICES"] = "0"
+# os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
 import numpy as np
 import tensorflow as tf
@@ -9,7 +9,7 @@ from CityscapesHandler import CityscapesHandler
 from PixelNet import PixelNet
 
 csh = CityscapesHandler()
-n_images = 500  # max 500
+n_images = 50  # max 500
 n_classes = csh.getNumTrainIDLabels()
 input_image_shape = (224, 224)  # (width, height)
 model_path = os.path.dirname('./model/checkpoint')
@@ -26,6 +26,7 @@ input_image_shape = val_x[0].shape
 
 
 def draw_results(res):
+    res = csh.fromTrainIdToLabelId(res)
     image = np.full((input_image_shape[0], input_image_shape[1], 3), 255)
     for k in range(0, image.shape[0]):
         for i in range(0, image.shape[1]):
@@ -66,5 +67,5 @@ with tf.Graph().as_default():
         csh.savePrediction(res, prediction_filenames[k], image_shape=(2048, 1024))
         print("saving output done")
 
-        # result_image = draw_results(res)
-        # csh.displayImage(np.concatenate((val_x[k], result_image), axis=0).astype(np.uint8))
+        result_image = draw_results(res)
+        csh.displayImage(np.concatenate((val_x[k], result_image), axis=0).astype(np.uint8), filename=prediction_filenames[k])
